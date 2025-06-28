@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/auth/schedule-monthly-entry",
-      "schedule": "* * * * *"
+      "schedule": "0 5 * * *"
     }
   ]
 }
