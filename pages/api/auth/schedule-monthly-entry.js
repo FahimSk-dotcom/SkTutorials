@@ -18,6 +18,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' })
   }
 
+  // ✅ Step 1: Secure the endpoint using CRON_SECRET
+  const authHeader = req.headers.authorization || ''
+  const token = authHeader.split(' ')[1] // "Bearer <token>"
+  if (token !== process.env.CRON_SECRET) {
+    return res.status(401).json({ message: 'Unauthorized' })
+  }
+
   try {
     const db = await connectDB()
     const studentsCollection = db.collection('students')
@@ -31,6 +38,7 @@ export default async function handler(req, res) {
     const todayDate = today.getDate()
 
     const activeStudents = await studentsCollection.find({ isActive: true }).toArray()
+    console.log(`📦 Found ${activeStudents.length} active students`)
 
     let updatedCount = 0
 
@@ -38,7 +46,6 @@ export default async function handler(req, res) {
       const lastPaidDate = new Date(student.lastFeePaidDate)
       const lastPaidDay = lastPaidDate.getDate()
 
-      // Match today's day with lastPaidDay
       if (todayDate !== lastPaidDay) continue
 
       const monthlyFeeStatus = student.monthlyFeeStatus || []
@@ -63,6 +70,7 @@ export default async function handler(req, res) {
         }
       )
       updatedCount++
+      console.log(`✅ Added unpaid entry for: ${student.name}`)
     }
 
     return res.status(200).json({
@@ -70,7 +78,7 @@ export default async function handler(req, res) {
     })
 
   } catch (error) {
-    console.error('Schedule monthly entry error:', error)
+    console.error('❌ Schedule monthly entry error:', error)
     return res.status(500).json({ message: 'Internal server error' })
   }
 }
