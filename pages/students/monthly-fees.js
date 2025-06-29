@@ -67,44 +67,109 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
     };
 
     // Calculate fee status for a student
-    const calculateFeeStatus = (student) => {
-        const today = new Date();
-        const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+// Fixed calculateFeeStatus function
+const calculateFeeStatus = (student) => {
+    const today = new Date();
+    const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-        // Calculate due date based on admission date
-        const admissionDate = new Date(student.admissionDate);
-        const dueDate = new Date(today.getFullYear(), today.getMonth(), admissionDate.getDate());
+    // Calculate due date based on admission date
+    const admissionDate = new Date(student.admissionDate);
+    const dueDate = new Date(today.getFullYear(), today.getMonth(), admissionDate.getDate());
 
-        // Check if current month fee is paid
-        const currentMonthStatus = student.monthlyFeeStatus?.find(status => status.month === currentMonth);
+    // Check if current month fee is paid
+    const currentMonthStatus = student.monthlyFeeStatus?.find(status => status.month === currentMonth);
 
-        let status = 'due';
-        let statusColor = 'bg-amber-500';
-        let statusIcon = Clock;
+    let status = 'due';
+    let statusColor = 'bg-amber-500';
+    let statusIcon = Clock;
 
-        if (currentMonthStatus?.paid) {
-            status = 'paid';
-            statusColor = 'bg-green-500';
-            statusIcon = Check;
+    if (currentMonthStatus?.paid) {
+        status = 'paid';
+        statusColor = 'bg-green-500';
+        statusIcon = Check;
+    } else {
+        // Fix: Compare dates properly by using toDateString() or by comparing year, month, and date
+        const todayDateString = today.toDateString();
+        const dueDateString = dueDate.toDateString();
+        
+        if (dueDateString === todayDateString) {
+            status = 'due-today';
+            statusColor = 'bg-amber-500';
+            statusIcon = Clock;
         } else if (dueDate < today) {
             status = 'overdue';
             statusColor = 'bg-red-500';
             statusIcon = AlertCircle;
-        } else if (dueDate.toDateString() === today.toDateString()) {
-            status = 'due-today';
+        } else {
+            status = 'due';
             statusColor = 'bg-amber-500';
             statusIcon = Clock;
         }
-        return {
-            status,
-            statusColor,
-            statusIcon,
-            dueDate,
-            currentMonthStatus,
-            currentMonth
-        };
+    }
 
+    return {
+        status,
+        statusColor,
+        statusIcon,
+        dueDate,
+        currentMonthStatus,
+        currentMonth
     };
+};
+
+// Alternative approach - more robust date comparison
+const calculateFeeStatusAlternative = (student) => {
+    const today = new Date();
+    const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // Calculate due date based on admission date
+    const admissionDate = new Date(student.admissionDate);
+    const dueDate = new Date(today.getFullYear(), today.getMonth(), admissionDate.getDate());
+
+    // Check if current month fee is paid
+    const currentMonthStatus = student.monthlyFeeStatus?.find(status => status.month === currentMonth);
+
+    let status = 'due';
+    let statusColor = 'bg-amber-500';
+    let statusIcon = Clock;
+
+    if (currentMonthStatus?.paid) {
+        status = 'paid';
+        statusColor = 'bg-green-500';
+        statusIcon = Check;
+    } else {
+        // More robust date comparison
+        const todayDay = today.getDate();
+        const dueDateDay = dueDate.getDate();
+        const todayMonth = today.getMonth();
+        const dueDateMonth = dueDate.getMonth();
+        const todayYear = today.getFullYear();
+        const dueDateYear = dueDate.getFullYear();
+        
+        if (todayYear === dueDateYear && todayMonth === dueDateMonth && todayDay === dueDateDay) {
+            status = 'due-today';
+            statusColor = 'bg-amber-500';
+            statusIcon = Clock;
+        } else if (dueDate < today) {
+            status = 'overdue';
+            statusColor = 'bg-red-500';
+            statusIcon = AlertCircle;
+        } else {
+            status = 'due';
+            statusColor = 'bg-amber-500';
+            statusIcon = Clock;
+        }
+    }
+
+    return {
+        status,
+        statusColor,
+        statusIcon,
+        dueDate,
+        currentMonthStatus,
+        currentMonth
+    };
+};
 
     // Filter and search students
     const filteredStudents = useMemo(() => {

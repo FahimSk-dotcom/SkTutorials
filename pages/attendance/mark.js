@@ -242,17 +242,17 @@ export default function MarkAttendance({ darkMode, toggleDarkMode }) {
                             <span className="text-sm font-medium text-red-600 dark:text-red-400">Absent</span>
                           </label>
 
-                          {/* Leave */}
+                          {/* Late */}
                           <label className="flex items-center space-x-2 cursor-pointer">
                             <input
                               type="radio"
                               name={`attendance-${student.id}`}
-                              value="leave"
-                              checked={attendanceData[student.id] === 'leave'}
-                              onChange={() => handleAttendanceChange(student.id, 'leave')}
+                              value="late"
+                              checked={attendanceData[student.id] === 'late'}
+                              onChange={() => handleAttendanceChange(student.id, 'late')}
                               className="w-4 h-4 text-yellow-600 bg-gray-100 border-gray-300 focus:ring-yellow-500 dark:focus:ring-yellow-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                             />
-                            <span className="text-sm font-medium text-yellow-600 dark:text-yellow-400">Leave</span>
+                            <span className="text-sm font-medium text-yellow-600 dark:text-yellow-400">Late</span>
                           </label>
                         </div>
                       </div>

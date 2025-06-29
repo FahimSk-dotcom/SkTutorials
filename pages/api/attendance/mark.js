@@ -84,7 +84,7 @@ export default async function handler(req, res) {
         // Process each student's attendance
         for (const [studentId, status] of Object.entries(attendance)) {
           // Validate status
-          if (!['present', 'absent', 'leave'].includes(status)) {
+          if (!['present', 'absent', 'late'].includes(status)) {
             return res.status(400).json({ 
               message: `Invalid attendance status: ${status}` 
             })
