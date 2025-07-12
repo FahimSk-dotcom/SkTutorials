@@ -60,6 +60,7 @@ export default function Dashboard({ darkMode, toggleDarkMode }) {
       description: 'View Fees Collection Details',
       color: 'bg-amber-500'
     },
+
   ]
 
   const teacherLinks = [
