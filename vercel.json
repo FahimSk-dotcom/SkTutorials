@@ -4,5 +4,14 @@
       "path": "/api/auth/schedule-monthly-entry",
       "schedule": "0 5 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "pages/api/attendance.js": {
+      "maxDuration": 30
+    },
+    "pages/api/auth/schedule-monthly-entry.js": {
+      "maxDuration": 60
+    }
+  },
+  "regions": ["bom1"]
 }

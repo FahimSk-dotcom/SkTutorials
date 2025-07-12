@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import Layout from '../../components/Layout'
 import { getUserFromToken, getAuthToken } from '../../utils/auth'
 import { mockStudents, gradeOrder } from '../../utils/data'
-import { 
+import {
   ChartBarIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -28,6 +28,13 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
+  // Add attendanceData state
+  const [attendanceData, setAttendanceData] = useState([])
+
+  // Month names for the calculateGradeWiseData function
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                     'July', 'August', 'September', 'October', 'November', 'December']
+
   // Enhanced mock attendance data with more realistic patterns
   const generateAttendanceData = () => {
     return mockStudents.map(student => {
@@ -36,7 +43,7 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
       const presentDays = Math.floor(workingDays * (baseAttendance + Math.random() * 0.2))
       const leaveDays = Math.floor(Math.random() * 2)
       const absentDays = workingDays - presentDays - leaveDays
-      
+
       return {
         ...student,
         totalDays: workingDays,
@@ -45,7 +52,15 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
         leaveDays: Math.max(0, leaveDays),
         attendancePercentage: workingDays > 0 ? Math.round((presentDays / workingDays) * 100) : 0,
         lastAttended: new Date(Date.now() - Math.floor(Math.random() * 7) * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        monthlyTrend: generateMonthlyTrend()
+        monthlyTrend: generateMonthlyTrend(),
+        studentGrade: student.grade, // Add this for calculateGradeWiseData compatibility
+        // Add months structure for calculateGradeWiseData compatibility
+        months: {
+          [monthNames[selectedMonth - 1]]: Array.from({ length: workingDays }, (_, i) => ({
+            date: new Date(selectedYear, selectedMonth - 1, i + 1),
+            status: Math.random() > 0.15 ? 'present' : (Math.random() > 0.5 ? 'absent' : 'leave')
+          }))
+        }
       }
     })
   }
@@ -69,10 +84,9 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
     return workingDays
   }
 
-  const [mockAttendanceData, setMockAttendanceData] = useState([])
-
+  // Update attendanceData when month/year changes
   useEffect(() => {
-    setMockAttendanceData(generateAttendanceData())
+    setAttendanceData(generateAttendanceData())
   }, [selectedMonth, selectedYear])
 
   useEffect(() => {
@@ -81,7 +95,7 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
       router.push('/login')
       return
     }
-    
+
     const userData = getUserFromToken(token)
     if (userData && userData.role === 'admin') {
       setUser(userData)
@@ -90,10 +104,54 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
     }
   }, [router])
 
-  const filteredData = mockAttendanceData.filter(student => {
+  // Updated useEffect to load attendance data
+  useEffect(() => {
+    const loadAttendanceData = async () => {
+      const data = await fetchAttendanceData();
+      setAttendanceData(data);
+    };
+
+    loadAttendanceData();
+  }, [selectedMonth, selectedYear, selectedGrade]);
+
+  const fetchAttendanceData = async () => {
+    try {
+      setLoading(true);
+
+      // Replace this with your actual API call
+      const response = await fetch('/api/attendance/reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          year: selectedYear,
+          month: selectedMonth,
+          grade: selectedGrade !== 'all' ? selectedGrade : undefined
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch attendance data');
+      }
+
+      const data = await response.json();
+      return data;
+
+    } catch (error) {
+      console.error('Error fetching attendance data:', error);
+      // Fallback to mock data for now
+      return generateAttendanceData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredData = attendanceData.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.parentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.rollNumber.toLowerCase().includes(searchTerm.toLowerCase())
+      student.parentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.rollNumber.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesGrade = selectedGrade === 'all' || student.grade === selectedGrade
     return matchesSearch && matchesGrade
   })
@@ -106,39 +164,92 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
     absent: student.absentDays
   }))
 
-  const gradeWiseData = gradeOrder.map(grade => {
-    const gradeStudents = filteredData.filter(s => s.grade === grade)
-    const avgAttendance = gradeStudents.length > 0 
-      ? Math.round(gradeStudents.reduce((sum, s) => sum + s.attendancePercentage, 0) / gradeStudents.length)
-      : 0
-    return {
-      grade,
-      attendance: avgAttendance,
-      students: gradeStudents.length,
-      excellent: gradeStudents.filter(s => s.attendancePercentage >= 90).length,
-      poor: gradeStudents.filter(s => s.attendancePercentage < attendanceThreshold).length
-    }
-  }).filter(item => item.students > 0)
-
   const overallStats = {
     totalStudents: filteredData.length,
     avgAttendance: filteredData.length > 0 ? Math.round(filteredData.reduce((sum, s) => sum + s.attendancePercentage, 0) / filteredData.length) : 0,
     excellentAttendance: filteredData.filter(s => s.attendancePercentage >= 90).length,
     goodAttendance: filteredData.filter(s => s.attendancePercentage >= 75 && s.attendancePercentage < 90).length,
     poorAttendance: filteredData.filter(s => s.attendancePercentage < attendanceThreshold).length,
-    totalWorkingDays: mockAttendanceData.length > 0 ? mockAttendanceData[0].totalDays : 0
+    totalWorkingDays: attendanceData.length > 0 ? attendanceData[0].totalDays : 0
   }
 
+  const calculateGradeWiseData = (attendanceData) => {
+    // Group attendance data by grade
+    const gradeMap = new Map();
+
+    attendanceData.forEach(record => {
+      const grade = record.studentGrade || record.grade; // Handle both field names
+      if (!gradeMap.has(grade)) {
+        gradeMap.set(grade, {
+          grade: grade,
+          students: [],
+          totalStudents: 0,
+          totalPresentDays: 0,
+          totalPossibleDays: 0,
+          excellent: 0,
+          poor: 0
+        });
+      }
+
+      const gradeData = gradeMap.get(grade);
+      gradeData.students.push(record);
+      gradeData.totalStudents++;
+
+      // Calculate attendance for current month
+      const currentMonth = monthNames[selectedMonth - 1];
+      const monthData = record.months ? record.months[currentMonth] || [] : [];
+
+      if (monthData.length > 0) {
+        const presentDays = monthData.filter(day => day.status === 'present').length;
+        const totalDays = monthData.length;
+        const attendancePercentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
+
+        gradeData.totalPresentDays += presentDays;
+        gradeData.totalPossibleDays += totalDays;
+
+        // Count performance levels
+        if (attendancePercentage >= 90) {
+          gradeData.excellent++;
+        } else if (attendancePercentage < attendanceThreshold) {
+          gradeData.poor++;
+        }
+      } else {
+        // Fallback to use existing attendance data if months structure is not available
+        gradeData.totalPresentDays += record.presentDays || 0;
+        gradeData.totalPossibleDays += record.totalDays || 0;
+        
+        if (record.attendancePercentage >= 90) {
+          gradeData.excellent++;
+        } else if (record.attendancePercentage < attendanceThreshold) {
+          gradeData.poor++;
+        }
+      }
+    });
+
+    // Convert to array and calculate average attendance
+    return Array.from(gradeMap.values()).map(gradeData => ({
+      grade: gradeData.grade,
+      attendance: gradeData.totalPossibleDays > 0
+        ? Math.round((gradeData.totalPresentDays / gradeData.totalPossibleDays) * 100)
+        : 0,
+      students: gradeData.totalStudents,
+      excellent: gradeData.excellent,
+      poor: gradeData.poor
+    })).sort((a, b) => {
+      // Sort grades in logical order
+      const gradeOrder = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'];
+      return gradeOrder.indexOf(a.grade) - gradeOrder.indexOf(b.grade);
+    });
+  };
+
+  // Now this will work without ReferenceError
+  const gradeWiseData = calculateGradeWiseData(attendanceData);
   const pieData = [
     { name: 'Excellent (90%+)', value: overallStats.excellentAttendance, color: '#10b981' },
     { name: 'Good (75-89%)', value: overallStats.goodAttendance, color: '#f59e0b' },
     { name: 'Poor (<75%)', value: overallStats.poorAttendance, color: '#ef4444' }
   ].filter(item => item.value > 0)
 
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ]
 
   const exportToCSV = () => {
     setLoading(true)
@@ -207,7 +318,7 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
               </div>
             </div>
             <div className="flex space-x-3">
-              <button 
+              <button
                 onClick={exportToCSV}
                 disabled={loading}
                 className="btn-primary flex items-center space-x-2 disabled:opacity-50"
@@ -300,7 +411,7 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-300">Total Students</div>
           </div>
-          
+
           <div className="card text-center bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
             <ChartBarIcon className="w-8 h-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
             <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
@@ -308,7 +419,7 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-300">Average Attendance</div>
           </div>
-          
+
           <div className="card text-center bg-gradient-to-r from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20">
             <CheckCircleIcon className="w-8 h-8 text-emerald-600 dark:text-emerald-400 mx-auto mb-2" />
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">
@@ -316,7 +427,7 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-300">Excellent (90%+)</div>
           </div>
-          
+
           <div className="card text-center bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20">
             <ExclamationTriangleIcon className="w-8 h-8 text-red-600 dark:text-red-400 mx-auto mb-2" />
             <div className="text-2xl font-bold text-red-600 dark:text-red-400 mb-1">
@@ -353,22 +464,91 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
             <div className="card">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                 <AcademicCapIcon className="w-5 h-5 mr-2" />
-                Grade-wise Attendance Analysis
+                Grade-wise Attendance Analysis - {monthNames[selectedMonth - 1]} {selectedYear}
               </h3>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={gradeWiseData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="grade" />
-                    <YAxis domain={[0, 100]} />
-                    <Tooltip 
-                      formatter={(value, name) => [`${value}%`, name]}
-                      labelFormatter={(label) => `Grade: ${label}`}
-                    />
-                    <Bar dataKey="attendance" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+
+              {loading ? (
+                <div className="h-80 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={gradeWiseData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="grade"
+                        tick={{ fontSize: 12 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        tick={{ fontSize: 12 }}
+                        label={{ value: 'Attendance %', angle: -90, position: 'insideLeft' }}
+                      />
+                      <Tooltip
+                        formatter={(value, name) => {
+                          if (name === 'attendance') return [`${value}%`, 'Average Attendance'];
+                          return [value, name];
+                        }}
+                        labelFormatter={(label) => `Grade: ${label}`}
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-gray-900 dark:text-white">{`Grade: ${label}`}</p>
+                                <p className="text-blue-600 dark:text-blue-400">{`Attendance: ${data.attendance}%`}</p>
+                                <p className="text-gray-600 dark:text-gray-300">{`Students: ${data.students}`}</p>
+                                <p className="text-green-600 dark:text-green-400">{`Excellent (90%+): ${data.excellent}`}</p>
+                                <p className="text-red-600 dark:text-red-400">{`Needs Attention: ${data.poor}`}</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar
+                        dataKey="attendance"
+                        fill="#3b82f6"
+                        radius={[4, 4, 0, 0]}
+                        name="attendance"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Grade Summary Below Chart */}
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {gradeWiseData.map(grade => (
+                  <div key={grade.grade} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        Grade {grade.grade}
+                      </span>
+                      <span className={`text-lg font-bold ${grade.attendance >= 90 ? 'text-green-600 dark:text-green-400' :
+                        grade.attendance >= 75 ? 'text-yellow-600 dark:text-yellow-400' :
+                          'text-red-600 dark:text-red-400'
+                        }`}>
+                        {grade.attendance}%
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                      {grade.students} students • {grade.excellent} excellent • {grade.poor} need attention
+                    </div>
+                  </div>
+                ))}
               </div>
+
+              {gradeWiseData.length === 0 && (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <AcademicCapIcon className="mx-auto h-12 w-12 mb-2" />
+                  <p>No attendance data available for the selected criteria</p>
+                </div>
+              )}
             </div>
 
             {/* Pie Chart */}
@@ -510,7 +690,7 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
                 </select>
               </div>
             </div>
-            
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-800">
@@ -590,30 +770,27 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
                               <div className="text-sm font-bold text-gray-900 dark:text-white mr-2">
                                 {student.attendancePercentage}%
                               </div>
-                              <div className={`w-16 h-2 rounded-full ${
-                                student.attendancePercentage >= 90 ? 'bg-green-200 dark:bg-green-800' :
+                              <div className={`w-16 h-2 rounded-full ${student.attendancePercentage >= 90 ? 'bg-green-200 dark:bg-green-800' :
                                 student.attendancePercentage >= 75 ? 'bg-yellow-200 dark:bg-yellow-800' :
-                                'bg-red-200 dark:bg-red-800'
-                              }`}>
-                                <div 
-                                  className={`h-full rounded-full ${
-                                    student.attendancePercentage >= 90 ? 'bg-green-500' :
+                                  'bg-red-200 dark:bg-red-800'
+                                }`}>
+                                <div
+                                  className={`h-full rounded-full ${student.attendancePercentage >= 90 ? 'bg-green-500' :
                                     student.attendancePercentage >= 75 ? 'bg-yellow-500' :
-                                    'bg-red-500'
-                                  }`}
+                                      'bg-red-500'
+                                    }`}
                                   style={{ width: `${Math.min(student.attendancePercentage, 100)}%` }}
                                 />
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              student.attendancePercentage >= 90 
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200'
-                                : student.attendancePercentage >= 75 
-                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200'
-                                  : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200'
-                            }`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${student.attendancePercentage >= 90
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200'
+                              : student.attendancePercentage >= 75
+                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200'
+                              }`}>
                               {status.text}
                             </span>
                           </td>
@@ -628,7 +805,7 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
                     })}
                 </tbody>
               </table>
-              
+
               {filteredData.length === 0 && (
                 <div className="text-center py-12">
                   <UserGroupIcon className="mx-auto h-12 w-12 text-gray-400" />
@@ -639,8 +816,8 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
                 </div>
               )}
             </div>
-            
-            {filteredData.length > 0 && (
+
+            {/* {filteredData.length > 0 && (
               <div className="bg-gray-50 dark:bg-gray-800 px-6 py-3 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-700 dark:text-gray-300">
@@ -651,7 +828,7 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
                   </div>
                 </div>
               </div>
-            )}
+            )} */}
           </div>
         )}
 
@@ -678,10 +855,10 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
                   <Tooltip />
                   <Legend />
                   {filteredData.slice(0, 5).map((student, index) => (
-                    <Line 
+                    <Line
                       key={student.rollNumber}
-                      type="monotone" 
-                      dataKey={student.name.split(' ')[0]} 
+                      type="monotone"
+                      dataKey={student.name.split(' ')[0]}
                       stroke={['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'][index]}
                       strokeWidth={2}
                       dot={{ r: 4 }}
@@ -706,11 +883,10 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
                     <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
                       Grade {grade.grade}
                     </h4>
-                    <span className={`text-2xl font-bold ${
-                      grade.attendance >= 90 ? 'text-green-600 dark:text-green-400' :
+                    <span className={`text-2xl font-bold ${grade.attendance >= 90 ? 'text-green-600 dark:text-green-400' :
                       grade.attendance >= 75 ? 'text-yellow-600 dark:text-yellow-400' :
-                      'text-red-600 dark:text-red-400'
-                    }`}>
+                        'text-red-600 dark:text-red-400'
+                      }`}>
                       {grade.attendance}%
                     </span>
                   </div>
@@ -728,12 +904,11 @@ export default function AttendanceReports({ darkMode, toggleDarkMode }) {
                       <span className="font-medium text-red-600 dark:text-red-400">{grade.poor}</span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-3">
-                      <div 
-                        className={`h-2 rounded-full ${
-                          grade.attendance >= 90 ? 'bg-green-500' :
+                      <div
+                        className={`h-2 rounded-full ${grade.attendance >= 90 ? 'bg-green-500' :
                           grade.attendance >= 75 ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        }`}
+                            'bg-red-500'
+                          }`}
                         style={{ width: `${grade.attendance}%` }}
                       />
                     </div>

@@ -70,7 +70,7 @@ export default async function handler(req, res) {
         name: user.name
       },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '7d' }
     )
 
     // Update last login

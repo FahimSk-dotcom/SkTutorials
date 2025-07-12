@@ -144,7 +144,6 @@ export default function MarkAttendance({ darkMode, toggleDarkMode }) {
           onClose={() => setToast(null)}
         />
       )}
-
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="card mb-6">

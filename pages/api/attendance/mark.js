@@ -63,7 +63,7 @@ export default async function handler(req, res) {
       }
 
     } else if (req.method === 'POST') {
-      // Mark attendance - Memory Efficient Way
+      // Mark attendance - Ultra-fast bulk operations
       try {
         const { date, attendance } = req.body
 
@@ -81,111 +81,149 @@ export default async function handler(req, res) {
 
         console.log(`Marking attendance for ${month} ${year}`)
 
-        // Process each student's attendance
+        // Get all student IDs to process
+        const studentIds = Object.keys(attendance)
+        
+        // Validate all attendance statuses upfront
+        const invalidStatuses = Object.values(attendance).filter(status => 
+          !['present', 'absent', 'late'].includes(status)
+        )
+        if (invalidStatuses.length > 0) {
+          return res.status(400).json({ 
+            message: `Invalid attendance status found: ${invalidStatuses.join(', ')}` 
+          })
+        }
+
+        // BULK FETCH: Get all students in one query
+        const objectIds = studentIds.map(id => new ObjectId(id))
+        const studentsMap = new Map()
+        
+        const students = await studentsCollection.find({
+          _id: { $in: objectIds }
+        }).toArray()
+        
+        students.forEach(student => {
+          studentsMap.set(student._id.toString(), student)
+        })
+
+        // BULK FETCH: Get all existing attendance records for this year
+        const existingRecords = await attendanceCollection.find({
+          studentId: { $in: objectIds },
+          year: year
+        }).toArray()
+
+        const existingRecordsMap = new Map()
+        existingRecords.forEach(record => {
+          existingRecordsMap.set(record.studentId.toString(), record)
+        })
+
+        // Prepare bulk operations
+        const bulkOps = []
+        const newRecords = []
+        
+        const attendanceRecord = {
+          date: date,
+          markedBy: decoded.userId,
+          markedAt: new Date()
+        }
+
+        // Process each student (in memory - no DB calls)
         for (const [studentId, status] of Object.entries(attendance)) {
-          // Validate status
-          if (!['present', 'absent', 'late'].includes(status)) {
-            return res.status(400).json({ 
-              message: `Invalid attendance status: ${status}` 
-            })
+          const studentDetails = studentsMap.get(studentId)
+          
+          if (!studentDetails) {
+            console.log(`Student not found: ${studentId}`)
+            continue
           }
 
-          try {
-            // Fetch student details
-            const studentDetails = await studentsCollection.findOne({
-              _id: new ObjectId(studentId)
-            })
+          const recordWithStatus = {
+            ...attendanceRecord,
+            status: status
+          }
 
-            if (!studentDetails) {
-              console.log(`Student not found: ${studentId}`)
-              continue // Skip this student and continue with others
+          const existingRecord = existingRecordsMap.get(studentId)
+
+          if (existingRecord) {
+            // EXISTING YEAR RECORD - UPDATE
+            const monthData = { ...existingRecord.months }
+            
+            if (!monthData[month]) {
+              monthData[month] = []
             }
 
-            // Create attendance record for this date
-            const attendanceRecord = {
-              date: date,
-              status: status,
-              markedBy: decoded.userId,
-              markedAt: new Date()
+            // Check if attendance for this date already exists
+            const existingDateIndex = monthData[month].findIndex(entry => entry.date === date)
+            
+            if (existingDateIndex >= 0) {
+              // UPDATE EXISTING DATE
+              monthData[month][existingDateIndex] = recordWithStatus
+            } else {
+              // ADD NEW DATE TO EXISTING MONTH
+              monthData[month].push(recordWithStatus)
             }
 
-            // Find existing record for this student and year
-            const existingRecord = await attendanceCollection.findOne({
-              studentId: new ObjectId(studentId),
-              year: year
-            })
-
-            if (existingRecord) {
-              // EXISTING YEAR RECORD - ADD TO MONTH
-              console.log(`Updating existing record for ${studentDetails.name} - ${year}`)
-              
-              const monthData = { ...existingRecord.months } // Copy existing months
-              
-              // Initialize month array if it doesn't exist
-              if (!monthData[month]) {
-                monthData[month] = []
-                console.log(`Creating new month ${month} for ${studentDetails.name}`)
-              }
-
-              // Check if attendance for this date already exists
-              const existingDateIndex = monthData[month].findIndex(entry => entry.date === date)
-              
-              if (existingDateIndex >= 0) {
-                // UPDATE EXISTING DATE
-                console.log(`Updating attendance for ${studentDetails.name} on ${date}`)
-                monthData[month][existingDateIndex] = attendanceRecord
-              } else {
-                // ADD NEW DATE TO EXISTING MONTH
-                console.log(`Adding new date ${date} for ${studentDetails.name} in ${month}`)
-                monthData[month].push(attendanceRecord)
-              }
-
-              // Update the existing record
-              await attendanceCollection.updateOne(
-                { studentId: new ObjectId(studentId), year: year },
-                { 
+            // Add to bulk operations
+            bulkOps.push({
+              updateOne: {
+                filter: { studentId: new ObjectId(studentId), year: year },
+                update: { 
                   $set: { 
                     months: monthData,
                     updatedAt: new Date(),
                     updatedBy: decoded.userId,
-                    // Update student details in case they changed
                     studentName: studentDetails.name,
                     studentGrade: studentDetails.grade
                   }
                 }
-              )
-
-            } else {
-              // NEW YEAR RECORD - CREATE NEW DOCUMENT
-              console.log(`Creating new year record for ${studentDetails.name} - ${year}`)
-              
-              const newRecord = {
-                studentId: new ObjectId(studentId),
-                studentName: studentDetails.name,
-                studentGrade: studentDetails.grade,
-                year: year,
-                months: {
-                  [month]: [attendanceRecord] // Create new month with first attendance
-                },
-                createdAt: new Date(),
-                createdBy: decoded.userId
               }
+            })
 
-              await attendanceCollection.insertOne(newRecord)
+          } else {
+            // NEW YEAR RECORD - CREATE NEW DOCUMENT
+            const newRecord = {
+              studentId: new ObjectId(studentId),
+              studentName: studentDetails.name,
+              studentGrade: studentDetails.grade,
+              year: year,
+              months: {
+                [month]: [recordWithStatus]
+              },
+              createdAt: new Date(),
+              createdBy: decoded.userId
             }
 
-          } catch (studentError) {
-            console.error(`Error processing student ${studentId}:`, studentError)
-            // Continue with other students
+            newRecords.push(newRecord)
           }
         }
+
+        // Execute all database operations in parallel
+        const dbPromises = []
+        
+        // Bulk update existing records
+        if (bulkOps.length > 0) {
+          dbPromises.push(
+            attendanceCollection.bulkWrite(bulkOps, { ordered: false })
+          )
+        }
+        
+        // Bulk insert new records
+        if (newRecords.length > 0) {
+          dbPromises.push(
+            attendanceCollection.insertMany(newRecords, { ordered: false })
+          )
+        }
+
+        // Wait for all operations to complete
+        await Promise.all(dbPromises)
 
         res.status(200).json({
           message: 'Attendance marked successfully',
           date: date,
           month: month,
           year: year,
-          studentsProcessed: Object.keys(attendance).length
+          studentsProcessed: Object.keys(attendance).length,
+          updated: bulkOps.length,
+          created: newRecords.length
         })
 
       } catch (error) {
