@@ -9,6 +9,7 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
     const [filterStatus, setFilterStatus] = useState('All');
     const [currentPage, setCurrentPage] = useState(1);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [paymentData, setPaymentData] = useState({
         paymentMode: '',
@@ -67,109 +68,109 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
     };
 
     // Calculate fee status for a student
-// Fixed calculateFeeStatus function
-const calculateFeeStatus = (student) => {
-    const today = new Date();
-    const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+    // Fixed calculateFeeStatus function
+    const calculateFeeStatus = (student) => {
+        const today = new Date();
+        const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    // Calculate due date based on admission date
-    const admissionDate = new Date(student.admissionDate);
-    const dueDate = new Date(today.getFullYear(), today.getMonth(), admissionDate.getDate());
+        // Calculate due date based on admission date
+        const admissionDate = new Date(student.admissionDate);
+        const dueDate = new Date(today.getFullYear(), today.getMonth(), admissionDate.getDate());
 
-    // Check if current month fee is paid
-    const currentMonthStatus = student.monthlyFeeStatus?.find(status => status.month === currentMonth);
+        // Check if current month fee is paid
+        const currentMonthStatus = student.monthlyFeeStatus?.find(status => status.month === currentMonth);
 
-    let status = 'due';
-    let statusColor = 'bg-amber-500';
-    let statusIcon = Clock;
+        let status = 'due';
+        let statusColor = 'bg-amber-500';
+        let statusIcon = Clock;
 
-    if (currentMonthStatus?.paid) {
-        status = 'paid';
-        statusColor = 'bg-green-500';
-        statusIcon = Check;
-    } else {
-        // Fix: Compare dates properly by using toDateString() or by comparing year, month, and date
-        const todayDateString = today.toDateString();
-        const dueDateString = dueDate.toDateString();
-        
-        if (dueDateString === todayDateString) {
-            status = 'due-today';
-            statusColor = 'bg-amber-500';
-            statusIcon = Clock;
-        } else if (dueDate < today) {
-            status = 'overdue';
-            statusColor = 'bg-red-500';
-            statusIcon = AlertCircle;
+        if (currentMonthStatus?.paid) {
+            status = 'paid';
+            statusColor = 'bg-green-500';
+            statusIcon = Check;
         } else {
-            status = 'due';
-            statusColor = 'bg-amber-500';
-            statusIcon = Clock;
+            // Fix: Compare dates properly by using toDateString() or by comparing year, month, and date
+            const todayDateString = today.toDateString();
+            const dueDateString = dueDate.toDateString();
+
+            if (dueDateString === todayDateString) {
+                status = 'due-today';
+                statusColor = 'bg-amber-500';
+                statusIcon = Clock;
+            } else if (dueDate < today) {
+                status = 'overdue';
+                statusColor = 'bg-red-500';
+                statusIcon = AlertCircle;
+            } else {
+                status = 'due';
+                statusColor = 'bg-amber-500';
+                statusIcon = Clock;
+            }
         }
-    }
 
-    return {
-        status,
-        statusColor,
-        statusIcon,
-        dueDate,
-        currentMonthStatus,
-        currentMonth
+        return {
+            status,
+            statusColor,
+            statusIcon,
+            dueDate,
+            currentMonthStatus,
+            currentMonth
+        };
     };
-};
 
-// Alternative approach - more robust date comparison
-const calculateFeeStatusAlternative = (student) => {
-    const today = new Date();
-    const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+    // Alternative approach - more robust date comparison
+    const calculateFeeStatusAlternative = (student) => {
+        const today = new Date();
+        const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    // Calculate due date based on admission date
-    const admissionDate = new Date(student.admissionDate);
-    const dueDate = new Date(today.getFullYear(), today.getMonth(), admissionDate.getDate());
+        // Calculate due date based on admission date
+        const admissionDate = new Date(student.admissionDate);
+        const dueDate = new Date(today.getFullYear(), today.getMonth(), admissionDate.getDate());
 
-    // Check if current month fee is paid
-    const currentMonthStatus = student.monthlyFeeStatus?.find(status => status.month === currentMonth);
+        // Check if current month fee is paid
+        const currentMonthStatus = student.monthlyFeeStatus?.find(status => status.month === currentMonth);
 
-    let status = 'due';
-    let statusColor = 'bg-amber-500';
-    let statusIcon = Clock;
+        let status = 'due';
+        let statusColor = 'bg-amber-500';
+        let statusIcon = Clock;
 
-    if (currentMonthStatus?.paid) {
-        status = 'paid';
-        statusColor = 'bg-green-500';
-        statusIcon = Check;
-    } else {
-        // More robust date comparison
-        const todayDay = today.getDate();
-        const dueDateDay = dueDate.getDate();
-        const todayMonth = today.getMonth();
-        const dueDateMonth = dueDate.getMonth();
-        const todayYear = today.getFullYear();
-        const dueDateYear = dueDate.getFullYear();
-        
-        if (todayYear === dueDateYear && todayMonth === dueDateMonth && todayDay === dueDateDay) {
-            status = 'due-today';
-            statusColor = 'bg-amber-500';
-            statusIcon = Clock;
-        } else if (dueDate < today) {
-            status = 'overdue';
-            statusColor = 'bg-red-500';
-            statusIcon = AlertCircle;
+        if (currentMonthStatus?.paid) {
+            status = 'paid';
+            statusColor = 'bg-green-500';
+            statusIcon = Check;
         } else {
-            status = 'due';
-            statusColor = 'bg-amber-500';
-            statusIcon = Clock;
-        }
-    }
+            // More robust date comparison
+            const todayDay = today.getDate();
+            const dueDateDay = dueDate.getDate();
+            const todayMonth = today.getMonth();
+            const dueDateMonth = dueDate.getMonth();
+            const todayYear = today.getFullYear();
+            const dueDateYear = dueDate.getFullYear();
 
-    return {
-        status,
-        statusColor,
-        statusIcon,
-        dueDate,
-        currentMonthStatus,
-        currentMonth
+            if (todayYear === dueDateYear && todayMonth === dueDateMonth && todayDay === dueDateDay) {
+                status = 'due-today';
+                statusColor = 'bg-amber-500';
+                statusIcon = Clock;
+            } else if (dueDate < today) {
+                status = 'overdue';
+                statusColor = 'bg-red-500';
+                statusIcon = AlertCircle;
+            } else {
+                status = 'due';
+                statusColor = 'bg-amber-500';
+                statusIcon = Clock;
+            }
+        }
+
+        return {
+            status,
+            statusColor,
+            statusIcon,
+            dueDate,
+            currentMonthStatus,
+            currentMonth
+        };
     };
-};
 
     // Filter and search students
     const filteredStudents = useMemo(() => {
@@ -215,7 +216,7 @@ const calculateFeeStatusAlternative = (student) => {
             alert('Please fill in all required fields');
             return;
         }
-
+        setIsSubmitting(true);
         try {
             const today = new Date();
             const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -295,6 +296,8 @@ const calculateFeeStatusAlternative = (student) => {
                 // Example: window.location.href = '/login';
                 // Or: clearAuthState();
             }
+        }finally{
+            setIsSubmitting(false);
         }
     };
 
@@ -648,9 +651,11 @@ const calculateFeeStatusAlternative = (student) => {
                                     <button
                                         type="button"
                                         onClick={handlePaymentSubmit}
-                                        className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
+                                        disabled={isSubmitting} // ✅ Disable while submitting
+                                        className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors 
+                                        ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
                                     >
-                                        Receive Payment
+                                        {isSubmitting ? 'Processing...' : 'Receive Payment'}
                                     </button>
                                 </div>
                             </div>

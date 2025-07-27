@@ -35,6 +35,7 @@ export default function Navbar({ darkMode, toggleDarkMode }) {
       { href: '/dashboard', label: 'Dashboard' },
       { href: '/attendance/reports', label: 'Reports' },
       { href: '/students/manage', label: 'Manage Students' },
+      { href: '/students/monthly-fees', label: 'Monthly Fees' },
       { href: '/students/monthly-paid-fees', label: 'Revenue' },
     ] : [
       { href: '/dashboard', label: 'Dashboard' },
