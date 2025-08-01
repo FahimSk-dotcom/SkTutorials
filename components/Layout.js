@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 export default function Layout({ children }) {
   const [darkMode, setDarkMode] = useState(false)
   const [date, setDate] = useState('')
+  
   useEffect(() => {
     const savedDarkMode = localStorage.getItem('darkMode')
     if (savedDarkMode) {
@@ -13,6 +14,7 @@ export default function Layout({ children }) {
       setDarkMode(prefersDark)
     }
   }, [])
+  
   useEffect(() => {
     // Runs only on the client after hydration
     setDate(new Date().toLocaleDateString())
@@ -35,11 +37,12 @@ export default function Layout({ children }) {
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       <Navbar darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
 
-      {/* Content Area */}
-      <main className="flex-grow container mx-auto px-4 py-8">
+      {/* Content Area - Removed container and padding constraints */}
+      <main className="flex-grow w-full">
         {children}
       </main>
-      <footer className="text-center text-sm text-gray-500 dark:text-gray-400 py-4">
+      
+      <footer className="text-center text-sm text-gray-500 dark:text-gray-400 py-4 px-4">
         <p>SK Tutorial Management System • Report generated on {date}</p>
         <p>For any queries, contact the administration office.</p>
       </footer>

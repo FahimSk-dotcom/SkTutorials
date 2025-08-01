@@ -33,7 +33,7 @@ export default function Navbar({ darkMode, toggleDarkMode }) {
   const navLinks = user ? (
     user.role === 'admin' ? [
       { href: '/dashboard', label: 'Dashboard' },
-      { href: '/attendance/reports', label: 'Reports' },
+      { href: '/attendance/report', label: 'Reports' },
       { href: '/students/manage', label: 'Manage Students' },
       { href: '/students/monthly-fees', label: 'Monthly Fees' },
       { href: '/students/monthly-paid-fees', label: 'Revenue' },
