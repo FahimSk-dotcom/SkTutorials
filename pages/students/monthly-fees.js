@@ -71,33 +71,60 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
     // Fixed calculateFeeStatus function
     const calculateFeeStatus = (student) => {
         const today = new Date();
-        const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-        // Calculate due date based on admission date
         const admissionDate = new Date(student.admissionDate);
+
+        // Get all months from admission to current month
+        const monthsToCheck = [];
+        let checkDate = new Date(admissionDate.getFullYear(), admissionDate.getMonth(), 1);
+        const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+        while (checkDate <= currentMonth) {
+            monthsToCheck.push({
+                monthStr: checkDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
+                date: new Date(checkDate)
+            });
+            checkDate.setMonth(checkDate.getMonth() + 1);
+        }
+
+        // Check unpaid months (sort by date)
+        const unpaidMonths = monthsToCheck
+            .filter(month => {
+                const monthStatus = student.monthlyFeeStatus?.find(status => status.month === month.monthStr);
+                return !monthStatus?.paid;
+            })
+            .sort((a, b) => a.date - b.date)  // Sort chronologically
+            .map(month => month.monthStr);    // Extract month string
+
+        const currentMonthStr = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const currentMonthUnpaid = unpaidMonths.includes(currentMonthStr);
+        const pastMonthsUnpaid = unpaidMonths.filter(month => month !== currentMonthStr);
+
+        // Calculate due date based on admission date for current month
         const dueDate = new Date(today.getFullYear(), today.getMonth(), admissionDate.getDate());
 
-        // Check if current month fee is paid
-        const currentMonthStatus = student.monthlyFeeStatus?.find(status => status.month === currentMonth);
+        let status, statusColor, statusIcon;
 
-        let status = 'due';
-        let statusColor = 'bg-amber-500';
-        let statusIcon = Clock;
-
-        if (currentMonthStatus?.paid) {
+        if (unpaidMonths.length === 0) {
+            // All months paid
             status = 'paid';
             statusColor = 'bg-green-500';
             statusIcon = Check;
-        } else {
-            // Fix: Compare dates properly by using toDateString() or by comparing year, month, and date
-            const todayDateString = today.toDateString();
-            const dueDateString = dueDate.toDateString();
+        } else if (pastMonthsUnpaid.length > 0) {
+            // Has previous months unpaid (regardless of current month status)
+            status = 'past-overdue';
+            statusColor = 'bg-red-600';
+            statusIcon = AlertCircle;
+        } else if (currentMonthUnpaid) {
+            // Only current month is unpaid
+            const today = new Date();
+            const currentDay = today.getDate();
+            const dueDay = admissionDate.getDate();
 
-            if (dueDateString === todayDateString) {
+            if (currentDay === dueDay) {
                 status = 'due-today';
                 statusColor = 'bg-amber-500';
                 statusIcon = Clock;
-            } else if (dueDate < today) {
+            } else if (currentDay > dueDay) {
                 status = 'overdue';
                 statusColor = 'bg-red-500';
                 statusIcon = AlertCircle;
@@ -106,61 +133,15 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
                 statusColor = 'bg-amber-500';
                 statusIcon = Clock;
             }
-        }
-
-        return {
-            status,
-            statusColor,
-            statusIcon,
-            dueDate,
-            currentMonthStatus,
-            currentMonth
-        };
-    };
-
-    // Alternative approach - more robust date comparison
-    const calculateFeeStatusAlternative = (student) => {
-        const today = new Date();
-        const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-        // Calculate due date based on admission date
-        const admissionDate = new Date(student.admissionDate);
-        const dueDate = new Date(today.getFullYear(), today.getMonth(), admissionDate.getDate());
-
-        // Check if current month fee is paid
-        const currentMonthStatus = student.monthlyFeeStatus?.find(status => status.month === currentMonth);
-
-        let status = 'due';
-        let statusColor = 'bg-amber-500';
-        let statusIcon = Clock;
-
-        if (currentMonthStatus?.paid) {
-            status = 'paid';
-            statusColor = 'bg-green-500';
-            statusIcon = Check;
         } else {
-            // More robust date comparison
-            const todayDay = today.getDate();
-            const dueDateDay = dueDate.getDate();
-            const todayMonth = today.getMonth();
-            const dueDateMonth = dueDate.getMonth();
-            const todayYear = today.getFullYear();
-            const dueDateYear = dueDate.getFullYear();
-
-            if (todayYear === dueDateYear && todayMonth === dueDateMonth && todayDay === dueDateDay) {
-                status = 'due-today';
-                statusColor = 'bg-amber-500';
-                statusIcon = Clock;
-            } else if (dueDate < today) {
-                status = 'overdue';
-                statusColor = 'bg-red-500';
-                statusIcon = AlertCircle;
-            } else {
-                status = 'due';
-                statusColor = 'bg-amber-500';
-                statusIcon = Clock;
-            }
+            // Fallback case
+            status = 'due';
+            statusColor = 'bg-amber-500';
+            statusIcon = Clock;
         }
+
+        // Get current month status for payment mode display
+        const currentMonthStatus = student.monthlyFeeStatus?.find(status => status.month === currentMonthStr);
 
         return {
             status,
@@ -168,7 +149,11 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
             statusIcon,
             dueDate,
             currentMonthStatus,
-            currentMonth
+            currentMonth: currentMonthStr,
+            unpaidMonths,
+            pastMonthsUnpaid,
+            currentMonthUnpaid,
+            totalUnpaidMonths: unpaidMonths.length
         };
     };
 
@@ -191,7 +176,9 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
                 case 'Due Today':
                     return feeStatus.status === 'due-today';
                 case 'Overdue':
-                    return feeStatus.status === 'overdue';
+                    return feeStatus.status === 'overdue'; // Only current month overdue
+                case 'Past Overdue':
+                    return feeStatus.status === 'past-overdue'; // Has previous months unpaid
                 case 'Due':
                     return feeStatus.status === 'due' || feeStatus.status === 'due-today';
                 default:
@@ -211,110 +198,108 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
 
     // Handle payment submission
     const handlePaymentSubmit = async () => {
-        // Validation
         if (!paymentData.paymentMode || !paymentData.amount) {
             alert('Please fill in all required fields');
             return;
         }
+
         setIsSubmitting(true);
         try {
-            const today = new Date();
-            const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-            // Get the token from localStorage or wherever you store it
-            const token = localStorage.getItem('authToken'); // Using the correct key from your app
-
+            // ✅ Fetch token properly
+            const token = localStorage.getItem('authToken');
             if (!token) {
-                throw new Error('No authentication token found');
+                throw new Error('No authentication token found. Please log in again.');
             }
 
-            const updatedFeeStatus = [...(selectedStudent.monthlyFeeStatus || [])];
-            const existingIndex = updatedFeeStatus.findIndex(status => status.month === currentMonth);
+            // Get current fee status
+            const currentFeeStatus = [...(selectedStudent.monthlyFeeStatus || [])];
 
+            // Create new fee entry
             const newFeeEntry = {
-                month: currentMonth,
+                month: paymentData.month,
                 paid: true,
-                dueDate: calculateFeeStatus(selectedStudent).dueDate.toISOString(),
+                dueDate: new Date().toISOString(),
                 paidOn: new Date().toISOString(),
                 paymentMode: paymentData.paymentMode,
                 amount: parseFloat(paymentData.amount)
             };
 
-            if (existingIndex >= 0) {
-                updatedFeeStatus[existingIndex] = newFeeEntry;
-            } else {
-                updatedFeeStatus.push(newFeeEntry);
-            }
+            // Find if this month already exists
+            const existingIndex = currentFeeStatus.findIndex(status => status.month === paymentData.month);
 
-            // Make API call to update payment
+            if (existingIndex >= 0) {
+                currentFeeStatus[existingIndex] = newFeeEntry;
+            } else {
+                currentFeeStatus.push(newFeeEntry);
+            }
+            // Make API call
             const response = await fetch('/api/auth/monthly-fees', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${token}` // ✅ use token here
                 },
                 body: JSON.stringify({
                     studentId: selectedStudent._id,
-                    monthlyFeeStatus: updatedFeeStatus,
+                    monthlyFeeStatus: currentFeeStatus,
                     lastFeePaidDate: new Date().toISOString()
                 })
             });
 
             if (!response.ok) {
-                if (response.status === 401) {
-                    throw new Error('Unauthorized access. Please login again.');
-                }
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Failed to update payment');
             }
-
             const result = await response.json();
-
-            // Update the student in the local state
             const updatedStudents = students.map(student =>
                 student._id === selectedStudent._id
-                    ? { ...student, monthlyFeeStatus: updatedFeeStatus, lastFeePaidDate: new Date().toISOString() }
+                    ? { ...student, monthlyFeeStatus: currentFeeStatus, lastFeePaidDate: new Date().toISOString() }
                     : student
             );
             setStudents(updatedStudents);
 
-            // Close modal
             setShowPaymentModal(false);
             setSelectedStudent(null);
             setPaymentData({ paymentMode: '', amount: '', month: '' });
 
-            // Show success message
             alert('Payment updated successfully!');
-
         } catch (err) {
-            setError(err.message);
+            console.error('❌ Payment submission error:', err);
             alert('Error updating payment: ' + err.message);
-
-            // If it's an auth error, you might want to redirect to login
-            if (err.message.includes('Unauthorized') || err.message.includes('token')) {
-                // Redirect to login page or clear auth state
-                // Example: window.location.href = '/login';
-                // Or: clearAuthState();
-            }
-        }finally{
+        } finally {
             setIsSubmitting(false);
         }
     };
 
+
     const openPaymentModal = (student) => {
         setSelectedStudent(student);
-        const today = new Date();
-        const currentMonth = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const feeInfo = calculateFeeStatus(student);
+
+        // For past overdue, show the oldest unpaid month
+        let monthToSet;
+        if (feeInfo.status === 'past-overdue' && feeInfo.unpaidMonths?.length > 0) {
+            // Get the oldest unpaid month
+            monthToSet = feeInfo.unpaidMonths[0];
+        } else {
+            // For current month dues, use current month
+            const today = new Date();
+            monthToSet = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+        }
+
         setPaymentData({
             paymentMode: '',
             amount: '',
-            month: currentMonth
+            month: monthToSet
         });
         setShowPaymentModal(true);
     };
 
     const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('en-GB');
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Invalid Date';
+        return date.toLocaleDateString('en-GB');
     };
 
     const StatusBadge = ({ feeInfo }) => {
@@ -325,6 +310,7 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
                 case 'paid': return 'Paid';
                 case 'due-today': return 'Due Today';
                 case 'overdue': return 'Overdue';
+                case 'past-overdue': return 'Past Overdue';
                 default: return 'Due';
             }
         };
@@ -452,6 +438,19 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
                                 </div>
                             </div>
                         </div>
+                        <div className="bg-gray-800 rounded-lg p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-red-700 rounded-lg">
+                                    <AlertCircle size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold">
+                                        {filteredStudents.filter(s => calculateFeeStatus(s).status === 'past-overdue').length}
+                                    </p>
+                                    <p className="text-gray-400 text-sm">Past Overdue</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Search and Filters */}
@@ -471,7 +470,7 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
 
                             {/* Filter Buttons */}
                             <div className="flex gap-2">
-                                {['All', 'Paid', 'Due Today', 'Overdue', 'Due'].map((filter) => (
+                                {['All', 'Paid', 'Due Today', 'Overdue', 'Past Overdue', 'Due'].map((filter) => (
                                     <button
                                         key={filter}
                                         onClick={() => setFilterStatus(filter)}
@@ -527,18 +526,33 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
                                                 <td className="p-4">
                                                     <div className="flex items-center gap-2">
                                                         <Calendar size={16} className="text-gray-400" />
-                                                        <span className="text-sm">{formatDate(feeInfo.dueDate)}</span>
+                                                        <span className="text-sm">
+                                                            {feeInfo.unpaidMonths?.length > 0
+                                                                ? `${feeInfo.unpaidMonths.length} months overdue`
+                                                                : formatDate(feeInfo.dueDate)
+                                                            }
+                                                        </span>
                                                     </div>
                                                 </td>
                                                 <td className="p-4">
                                                     <StatusBadge feeInfo={feeInfo} />
                                                 </td>
                                                 <td className="p-4 text-gray-300">
-                                                    {feeInfo.currentMonthStatus?.paymentMode || '-'}
+                                                    {(() => {
+                                                        // For past overdue, show the most recent payment mode
+                                                        if (feeInfo.status === 'past-overdue') {
+                                                            const latestPaidMonth = student.monthlyFeeStatus
+                                                                ?.filter(status => status.paid)
+                                                                ?.sort((a, b) => new Date(b.paidOn) - new Date(a.paidOn))[0];
+                                                            return latestPaidMonth?.paymentMode || '-';
+                                                        }
+                                                        // For current month, show current month payment mode
+                                                        return feeInfo.currentMonthStatus?.paymentMode || '-';
+                                                    })()}
                                                 </td>
                                                 <td className="p-4">
                                                     <div className="flex items-center gap-2">
-                                                        {!feeInfo.currentMonthStatus?.paid && (
+                                                        {feeInfo.unpaidMonths?.length > 0 && (
                                                             <button
                                                                 onClick={() => openPaymentModal(student)}
                                                                 className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium transition-colors"
@@ -605,10 +619,47 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
                             <div className="mb-4 p-3 bg-gray-700 rounded-lg">
                                 <p className="text-sm text-gray-300">Student: <span className="font-medium text-white">{selectedStudent?.name}</span></p>
                                 <p className="text-sm text-gray-300">Grade: <span className="font-medium text-white">{selectedStudent?.grade}</span></p>
-                                <p className="text-sm text-gray-300">Month: <span className="font-medium text-white">{paymentData.month}</span></p>
+                                {(() => {
+                                    const feeInfo = calculateFeeStatus(selectedStudent);
+                                    return feeInfo.unpaidMonths?.length > 1 && (
+                                        <p className="text-sm text-red-300">
+                                            <span className="font-medium">{feeInfo.unpaidMonths.length} months unpaid</span>
+                                        </p>
+                                    );
+                                })()}
                             </div>
 
                             <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Month *
+                                    </label>
+                                    {(() => {
+                                        const feeInfo = calculateFeeStatus(selectedStudent);
+                                        return feeInfo?.unpaidMonths?.length > 1 ? (
+                                            <select
+                                                value={paymentData.month}
+                                                onChange={(e) => setPaymentData({ ...paymentData, month: e.target.value })}
+                                                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                                            >
+                                                {feeInfo.unpaidMonths.map(month => (
+                                                    <option key={month} value={month}>
+                                                        {month}
+                                                        {month !== feeInfo.unpaidMonths[feeInfo.unpaidMonths.length - 1] ? ' (Past Due)' : ' (Current)'}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={paymentData.month}
+                                                readOnly
+                                                className="w-full px-3 py-2 bg-gray-600 border border-gray-600 rounded-lg text-gray-300 cursor-not-allowed"
+                                            />
+                                        );
+                                    })()}
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Payment Mode *
@@ -651,9 +702,9 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
                                     <button
                                         type="button"
                                         onClick={handlePaymentSubmit}
-                                        disabled={isSubmitting} // ✅ Disable while submitting
+                                        disabled={isSubmitting}
                                         className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors 
-                                        ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                        ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
                                     >
                                         {isSubmitting ? 'Processing...' : 'Receive Payment'}
                                     </button>

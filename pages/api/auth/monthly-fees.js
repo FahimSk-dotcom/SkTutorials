@@ -38,7 +38,7 @@ const createEmailTransporter = () => {
 }
 
 function generateIdentityCard(studentData) {
- const photoUrl = studentData.photoUrl ?? 'https://res.cloudinary.com/dfmcngduw/image/upload/v1753630244/D9179F2C-2DF5-40D9-AB82-5E0702AE36A5_znoivl.png';
+  const photoUrl = studentData.photoUrl ?? 'https://res.cloudinary.com/dfmcngduw/image/upload/v1753630244/D9179F2C-2DF5-40D9-AB82-5E0702AE36A5_znoivl.png';
   return `
     <div style="width: 400px; margin: 20px auto; font-family: Arial, sans-serif; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
       <!-- Header -->
@@ -445,6 +445,16 @@ export default async function handler(req, res) {
           }
         }
 
+        console.log('🔍 API Request Body:', JSON.stringify(req.body, null, 2));
+        console.log('📝 Student ID:', studentId);
+        console.log('📅 Monthly Fee Status being sent:', JSON.stringify(monthlyFeeStatus, null, 2));
+        console.log('✅ Update Result:', updateResult);
+        console.log('📊 Modified Count:', updateResult.modifiedCount);
+        console.log('🎯 Matched Count:', updateResult.matchedCount);
+
+        // Log the updated student data
+
+        console.log('📋 Updated student monthlyFeeStatus:', JSON.stringify(updatedStudent.monthlyFeeStatus, null, 2));
         res.status(200).json({
           message: 'Payment updated successfully',
           student: {
