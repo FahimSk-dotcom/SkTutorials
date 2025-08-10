@@ -14,14 +14,13 @@ async function connectDB() {
   return db
 }
 
-// Enhanced email configuration with debugging
+// Enhanced email configuration
 const createEmailTransporter = () => {
-
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
     throw new Error('Missing SMTP configuration. Please check environment variables.')
   }
 
-  return nodemailer.createTransport({
+  return nodemailer.createTransporter({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT) || 587,
     secure: process.env.SMTP_PORT === '465',
@@ -32,8 +31,8 @@ const createEmailTransporter = () => {
     tls: {
       rejectUnauthorized: false
     },
-    debug: true, // Enable debug logs
-    logger: true // Enable logger
+    debug: true,
+    logger: true
   })
 }
 
@@ -116,11 +115,9 @@ function generateIdentityCard(studentData) {
   `
 }
 
-// Enhanced email sending function with better error handling
+// Enhanced email sending function  
 async function sendFeeConfirmationEmail(studentData, feeDetails, transporter) {
   try {
-
-
     if (!studentData.parentEmail) {
       throw new Error('Parent email is missing or empty')
     }
@@ -165,11 +162,11 @@ async function sendFeeConfirmationEmail(studentData, feeDetails, transporter) {
             </tr>
             <tr>
               <td style="padding: 8px 0; font-weight: bold; color: #555;">Amount:</td>
-              <td style="padding: 8px 0; color: #333; font-weight: bold;">₹${feeDetails.amount}</td>
+              <td style="padding: 8px 0; color: #333; font-weight: bold;">₹${feeDetails.amount || 'N/A'}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; font-weight: bold; color: #555;">Payment Mode:</td>
-              <td style="padding: 8px 0; color: #333;">${feeDetails.paymentMode}</td>
+              <td style="padding: 8px 0; color: #333;">${feeDetails.paymentMode || 'N/A'}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; font-weight: bold; color: #555;">Payment Date:</td>
@@ -210,31 +207,22 @@ async function sendFeeConfirmationEmail(studentData, feeDetails, transporter) {
       html: identityCardHtml + emailContent
     }
 
-
     const result = await transporter.sendMail(mailOptions)
-
     return { success: true, messageId: result.messageId, response: result.response }
 
   } catch (error) {
     console.error('❌ Error sending email:', error)
-    console.error('Error details:', {
-      message: error.message,
-      code: error.code,
-      command: error.command,
-      stack: error.stack
-    })
     return { success: false, error: error.message, details: error }
   }
 }
 
-// Enhanced function to get student data by contact number with format normalization
+// Enhanced function to get student data by contact number
 async function getStudentDataByContact(contactNumber) {
   try {
-
     const database = await connectDB()
     const studentsDataCollection = database.collection('studentsData')
 
-    // Function to normalize contact number (remove spaces, special chars except +)
+    // Function to normalize contact number
     const normalizeContact = (contact) => {
       if (!contact) return null
       return String(contact).replace(/\s+/g, '').replace(/[^\d+]/g, '')
@@ -263,13 +251,10 @@ async function getStudentDataByContact(contactNumber) {
 
     // If still not found, try normalized matching
     if (!studentData && normalizedSearchContact) {
-
-      // Get all contacts and normalize them for comparison
       const allStudents = await studentsDataCollection.find({}).toArray()
 
       for (const student of allStudents) {
         const normalizedDbContact = normalizeContact(student.contactNumber)
-
         if (normalizedDbContact === normalizedSearchContact) {
           studentData = student
           break
@@ -280,7 +265,6 @@ async function getStudentDataByContact(contactNumber) {
     // If still not found, try partial matching (last 10 digits)
     if (!studentData && normalizedSearchContact && normalizedSearchContact.length >= 10) {
       const lastTenDigits = normalizedSearchContact.slice(-10)
-
       const allStudents = await studentsDataCollection.find({}).toArray()
 
       for (const student of allStudents) {
@@ -314,16 +298,62 @@ function verifyToken(req) {
   }
 }
 
+// Helper function to find newly paid fees - optimized for frontend logic
+function findNewlyPaidFees(oldFeeStatus = [], newFeeStatus = []) {
+  const newlyPaid = []
+  
+  for (const newFee of newFeeStatus) {
+    if (newFee.paid === true && newFee.amount && newFee.paymentMode) {
+      const existingFee = oldFeeStatus.find(oldFee => oldFee.month === newFee.month)
+      
+      // Check if this is a new payment or updated payment
+      if (!existingFee || existingFee.paid !== true || 
+          existingFee.amount !== newFee.amount || 
+          existingFee.paymentMode !== newFee.paymentMode) {
+        newlyPaid.push(newFee)
+      }
+    }
+  }
+  
+  return newlyPaid
+}
+
+// Async function to send emails in background
+async function sendEmailsInBackground(studentData, newlyPaidFees) {
+  try {
+    if (!studentData || !studentData.parentEmail || newlyPaidFees.length === 0) {
+      return
+    }
+
+    const transporter = createEmailTransporter()
+    
+    for (const paidFee of newlyPaidFees) {
+      try {
+        const emailResult = await sendFeeConfirmationEmail(studentData, paidFee, transporter)
+        
+        if (emailResult.success) {
+          console.log(`✅ Email sent successfully for ${studentData.studentName} - ${paidFee.month}`)
+        } else {
+          console.error(`❌ Failed to send email for ${studentData.studentName} - ${paidFee.month}:`, emailResult.error)
+        }
+      } catch (emailError) {
+        console.error(`❌ Error sending individual email for ${paidFee.month}:`, emailError)
+      }
+    }
+  } catch (error) {
+    console.error('❌ Background email process error:', error)
+  }
+}
+
 export default async function handler(req, res) {
   try {
     // Verify authentication
     const decoded = verifyToken(req)
-
     const database = await connectDB()
     const students = database.collection('students')
 
     if (req.method === 'GET') {
-      // Fetch all students with their fee status (unchanged)
+      // Fetch all students with their fee status - optimized response for frontend
       try {
         const studentsList = await students.find({
           isActive: true
@@ -349,10 +379,16 @@ export default async function handler(req, res) {
       }
 
     } else if (req.method === 'PUT') {
-      // Update student's monthly fee payment with enhanced email handling
+      // Update student's monthly fee payment - optimized for frontend
       try {
-
         const { studentId, monthlyFeeStatus, lastFeePaidDate, contactNumber } = req.body
+
+        console.log('🔍 PUT Request received:', {
+          studentId,
+          monthlyFeeStatusLength: monthlyFeeStatus?.length,
+          lastFeePaidDate,
+          contactNumber
+        })
 
         // Validate input
         if (!studentId || !monthlyFeeStatus) {
@@ -361,7 +397,6 @@ export default async function handler(req, res) {
           })
         }
 
-
         // Validate ObjectId
         if (!ObjectId.isValid(studentId)) {
           return res.status(400).json({
@@ -369,7 +404,7 @@ export default async function handler(req, res) {
           })
         }
 
-        // Find the student first
+        // Find the student first to get old fee status
         const student = await students.findOne({
           _id: new ObjectId(studentId),
           isActive: true
@@ -381,6 +416,8 @@ export default async function handler(req, res) {
           })
         }
 
+        // Store old fee status for comparison
+        const oldFeeStatus = student.monthlyFeeStatus || []
 
         // Update the student's fee status
         const updateResult = await students.updateOne(
@@ -395,67 +432,24 @@ export default async function handler(req, res) {
           }
         )
 
+        console.log('📊 Update result:', {
+          matchedCount: updateResult.matchedCount,
+          modifiedCount: updateResult.modifiedCount
+        })
+
         if (updateResult.matchedCount === 0) {
           return res.status(404).json({
             message: 'Student not found'
           })
         }
 
-        if (updateResult.modifiedCount === 0) {
-          return res.status(400).json({
-            message: 'No changes made to student record'
-          })
-        }
-
-
         // Get the updated student record
         const updatedStudent = await students.findOne({
           _id: new ObjectId(studentId)
         })
 
-        // Email sending logic with better error handling
-        const contactToUse = contactNumber || student.contact
-
-        if (contactToUse) {
-
-          // Check if any fee was marked as paid
-          const paidFees = monthlyFeeStatus.filter(fee => fee.paid === true)
-
-          if (paidFees.length > 0) {
-            try {
-              // Get student data from studentsData collection
-              const studentData = await getStudentDataByContact(contactToUse)
-
-              if (studentData && studentData.parentEmail) {
-                const transporter = createEmailTransporter()
-
-                // Send email for each paid fee
-                for (const paidFee of paidFees) {
-                  const emailResult = await sendFeeConfirmationEmail(studentData, paidFee, transporter)
-
-                  if (emailResult.success) {
-                  } else {
-                    console.error(`❌ Failed to send email for ${studentData.studentName} - ${paidFee.month}:`, emailResult.error)
-                  }
-                }
-              }
-            } catch (emailError) {
-              console.error('❌ Email process error:', emailError)
-            }
-          }
-        }
-
-        console.log('🔍 API Request Body:', JSON.stringify(req.body, null, 2));
-        console.log('📝 Student ID:', studentId);
-        console.log('📅 Monthly Fee Status being sent:', JSON.stringify(monthlyFeeStatus, null, 2));
-        console.log('✅ Update Result:', updateResult);
-        console.log('📊 Modified Count:', updateResult.modifiedCount);
-        console.log('🎯 Matched Count:', updateResult.matchedCount);
-
-        // Log the updated student data
-
-        console.log('📋 Updated student monthlyFeeStatus:', JSON.stringify(updatedStudent.monthlyFeeStatus, null, 2));
-        res.status(200).json({
+        // Prepare response in the exact format expected by frontend
+        const responseData = {
           message: 'Payment updated successfully',
           student: {
             _id: updatedStudent._id.toString(),
@@ -467,7 +461,37 @@ export default async function handler(req, res) {
             monthlyFeeStatus: updatedStudent.monthlyFeeStatus,
             lastFeePaidDate: updatedStudent.lastFeePaidDate
           }
-        })
+        }
+
+        // Send response immediately for better performance
+        res.status(200).json(responseData)
+
+        // Email sending logic in background - only for newly paid fees
+        const contactToUse = contactNumber || student.contact
+
+        if (contactToUse) {
+          // Find only newly paid fees
+          const newlyPaidFees = findNewlyPaidFees(oldFeeStatus, monthlyFeeStatus)
+          
+          console.log('📧 Newly paid fees found:', newlyPaidFees.length)
+          
+          if (newlyPaidFees.length > 0) {
+            // Send emails in background without blocking response
+            setImmediate(async () => {
+              try {
+                const studentData = await getStudentDataByContact(contactToUse)
+                if (studentData && studentData.parentEmail) {
+                  console.log(`📤 Sending ${newlyPaidFees.length} emails for ${studentData.studentName}`)
+                  await sendEmailsInBackground(studentData, newlyPaidFees)
+                } else {
+                  console.log(`⚠️ No student data or email found for contact: ${contactToUse}`)
+                }
+              } catch (error) {
+                console.error('❌ Background email error:', error)
+              }
+            })
+          }
+        }
 
       } catch (error) {
         console.error('❌ Error updating payment:', error)
@@ -477,105 +501,8 @@ export default async function handler(req, res) {
         })
       }
 
-    } else if (req.method === 'POST') {
-      // Add a new fee payment record with enhanced email handling
-      try {
-
-        const { studentId, month, paymentMode, amount, paidOn, contactNumber } = req.body
-
-        // Validate input
-        if (!studentId || !month || !paymentMode || !amount) {
-          return res.status(400).json({
-            message: 'Student ID, month, payment mode, and amount are required'
-          })
-        }
-
-        if (!contactNumber) {
-        }
-
-        // Validate ObjectId
-        if (!ObjectId.isValid(studentId)) {
-          return res.status(400).json({
-            message: 'Invalid student ID format'
-          })
-        }
-
-        // Find the student
-        const student = await students.findOne({
-          _id: new ObjectId(studentId),
-          isActive: true
-        })
-
-        if (!student) {
-          return res.status(404).json({
-            message: 'Student not found'
-          })
-        }
-
-        // Calculate due date based on admission date
-        const admissionDate = new Date(student.admissionDate)
-        const today = new Date()
-        const dueDate = new Date(today.getFullYear(), today.getMonth(), admissionDate.getDate())
-
-        // Create new fee entry
-        const newFeeEntry = {
-          month: month,
-          paid: true,
-          dueDate: dueDate.toISOString(),
-          paidOn: paidOn || new Date().toISOString(),
-          paymentMode: paymentMode,
-          amount: parseFloat(amount),
-          recordedBy: decoded.userId,
-          recordedAt: new Date()
-        }
-
-        // Get existing fee status
-        const existingFeeStatus = student.monthlyFeeStatus || []
-
-        // Check if payment for this month already exists
-        const existingIndex = existingFeeStatus.findIndex(status => status.month === month)
-
-        if (existingIndex >= 0) {
-          existingFeeStatus[existingIndex] = newFeeEntry
-        } else {
-          existingFeeStatus.push(newFeeEntry)
-        }
-
-        // Update the student record
-        const updateResult = await students.updateOne(
-          { _id: new ObjectId(studentId) },
-          {
-            $set: {
-              monthlyFeeStatus: existingFeeStatus,
-              lastFeePaidDate: new Date(),
-              updatedAt: new Date(),
-              updatedBy: decoded.userId
-            }
-          }
-        )
-
-        if (updateResult.modifiedCount === 0) {
-          return res.status(400).json({
-            message: 'Failed to update payment record'
-          })
-        }
-
-
-        res.status(201).json({
-          message: 'Payment recorded successfully',
-          feeEntry: newFeeEntry
-        })
-
-      } catch (error) {
-        console.error('❌ Error recording payment:', error)
-        res.status(500).json({
-          message: 'Error recording payment',
-          error: error.message
-        })
-      }
-
     } else if (req.method === 'DELETE') {
-      // Delete a fee payment record (unchanged from original)
+      // Delete a fee payment record - optimized for frontend
       try {
         const { studentId, month } = req.body
 
