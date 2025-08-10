@@ -1,3 +1,4 @@
+import Layout from '@/components/Layout';
 import { useState, useEffect, useRef } from 'react';
 
 export default function GenerateStudentID() {
@@ -49,130 +50,30 @@ export default function GenerateStudentID() {
       });
   };
 
-const generateStudentID = () => {
-  if (!selectedStudent) {
-    setMessage('Please select a student first');
-    return;
-  }
+  const generateStudentID = () => {
+    if (!selectedStudent) {
+      setMessage('Please select a student first');
+      return;
+    }
 
-  const student = students.find(s => s._id === selectedStudent);
-  if (!student) {
-    setMessage('Student not found');
-    return;
-  }
+    const student = students.find(s => s._id === selectedStudent);
+    if (!student) {
+      setMessage('Student not found');
+      return;
+    }
 
-  // Generate roll number if not exists
-  const rollNumber = `SK${String(students.indexOf(student) + 1).padStart(3, '0')}`;
-  
-  // Create enhanced student data with additional fields
-  const enhancedStudentData = {
-    ...student,
-    rollNumber,
-    idNumber: `ID-${new Date().getFullYear()}-${rollNumber}`,
-    validUntil: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
+    // Generate roll number if not exists
+    const rollNumber = `SK${String(students.indexOf(student) + 1).padStart(3, '0')}`;
+
+    setIdCardData({
+      ...student,
+      rollNumber,
+      idNumber: `ID-${new Date().getFullYear()}-${rollNumber}`,
+      validUntil: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
+    });
+
+    setMessage('ID Card generated successfully!');
   };
-
-  // Store the current student data for the preview
-  setCurrentStudentData(enhancedStudentData);
-
-  // Generate the styled HTML identity card
-  const photoUrl = enhancedStudentData.photoUrl ?? 'https://res.cloudinary.com/dfmcngduw/image/upload/v1753630244/D9179F2C-2DF5-40D9-AB82-5E0702AE36A5_znoivl.png';
-  
-  const identityCardHTML = `
-    <div style="width: 400px; margin: 20px auto; font-family: Arial, sans-serif; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-      <!-- Header -->
-      <div style="background: linear-gradient(135deg, #4A90E2, #357ABD); color: white; padding: 15px; text-align: center; position: relative;">
-        <!-- Card hole punch -->
-        <div style="background: white; width: 60px; height: 12px; border-radius: 6px; margin: 0 auto 15px;"></div>
-        
-        <!-- Logo and Title -->
-        <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
-          <!-- Graduation cap icon -->
-          <div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
-              <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"/>
-            </svg>
-          </div>
-          <h1 style="margin: 0; font-size: 28px; font-weight: bold; letter-spacing: 1px;">SK TUTORIAL</h1>
-        </div>
-      </div>
-
-      <!-- Content Area -->
-      <div style="background: white; padding: 0;">
-        <!-- Student Photo -->
-        <div style="text-align: center; padding: 20px 20px 10px;">
-          <div style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid #4A90E2; margin: 0 auto; overflow: hidden;">
-            <img src="${photoUrl}" alt="Student Photo" style="width: 100%; height: 100%; object-fit: cover;">
-          </div>
-        </div>
-
-        <!-- Student Name -->
-        <div style="text-align: center; padding: 0 20px 20px;">
-          <h2 style="margin: 0; color: #4A90E2; font-size: 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
-            ${enhancedStudentData.studentName || enhancedStudentData.name || 'N/A'}
-          </h2>
-        </div>
-
-        <!-- Details -->
-        <div style="padding: 0 30px 30px; color: #333;">
-          <div style="margin-bottom: 12px;">
-            <span style="font-weight: bold; color: #333; display: inline-block; width: 140px;">Roll Number :</span>
-            <span style="color: #4A90E2; font-weight: 600;">${enhancedStudentData.rollNumber}</span>
-          </div>
-          
-          <div style="margin-bottom: 12px;">
-            <span style="font-weight: bold; color: #333; display: inline-block; width: 140px;">ID Number :</span>
-            <span style="color: #4A90E2; font-weight: 600;">${enhancedStudentData.idNumber}</span>
-          </div>
-          
-          <div style="margin-bottom: 12px;">
-            <span style="font-weight: bold; color: #333; display: inline-block; width: 140px;">Class :</span>
-            <span style="color: #4A90E2; font-weight: 600;">${enhancedStudentData.class || enhancedStudentData.grade || 'N/A'}</span>
-          </div>
-          
-          <div style="margin-bottom: 12px;">
-            <span style="font-weight: bold; color: #333; display: inline-block; width: 140px;">Birth Date :</span>
-            <span style="color: #4A90E2; font-weight: 600;">${enhancedStudentData.birthdate ? new Date(enhancedStudentData.birthdate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : 'N/A'}</span>
-          </div>
-          
-          <div style="margin-bottom: 12px;">
-            <span style="font-weight: bold; color: #333; display: inline-block; width: 140px;">Admission Date :</span>
-            <span style="color: #4A90E2; font-weight: 600;">${enhancedStudentData.admissiondate || enhancedStudentData.admissionDate ? new Date(enhancedStudentData.admissiondate || enhancedStudentData.admissionDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : 'N/A'}</span>
-          </div>
-          
-          <div style="margin-bottom: 12px;">
-            <span style="font-weight: bold; color: #333; display: inline-block; width: 140px;">School Name :</span>
-            <span style="color: #4A90E2; font-weight: 600;">${enhancedStudentData.schoolName || 'N/A'}</span>
-          </div>
-          
-          <div style="margin-bottom: 12px;">
-            <span style="font-weight: bold; color: #333; display: inline-block; width: 140px;">Parent Name :</span>
-            <span style="color: #4A90E2; font-weight: 600;">${enhancedStudentData.parentName || 'N/A'}</span>
-          </div>
-          
-          <div style="margin-bottom: 12px;">
-            <span style="font-weight: bold; color: #333; display: inline-block; width: 140px;">Contact Number :</span>
-            <span style="color: #4A90E2; font-weight: 600;">${enhancedStudentData.contactNumber || enhancedStudentData.contact || 'N/A'}</span>
-          </div>
-          
-          <div style="margin-bottom: 12px;">
-            <span style="font-weight: bold; color: #333; display: inline-block; width: 140px;">Address :</span>
-            <span style="color: #4A90E2; font-weight: 600;">${enhancedStudentData.address || 'N/A'}</span>
-          </div>
-          
-          <div style="margin-bottom: 0;">
-            <span style="font-weight: bold; color: #333; display: inline-block; width: 140px;">Valid Until :</span>
-            <span style="color: #4A90E2; font-weight: 600;">${new Date(enhancedStudentData.validUntil).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Set the HTML content to be displayed on UI
-  setIdCardData(identityCardHTML);
-  setMessage('ID Card generated successfully!');
-};
 
   const downloadIDCard = () => {
     if (!idCardData || !idCardRef.current) {
@@ -189,13 +90,13 @@ const generateStudentID = () => {
       // Set canvas dimensions
       canvas.width = idCardElement.offsetWidth * 2;
       canvas.height = idCardElement.offsetHeight * 2;
-      
+
       // Scale for better quality
       ctx.scale(2, 2);
-      
+
       // Simple download trigger - you can implement html2canvas for better results
       setMessage('ID Card ready for download! (You can implement html2canvas for better image export)');
-      
+
     } catch (error) {
       setMessage('Error preparing download: ' + error.message);
     }
@@ -241,7 +142,7 @@ const generateStudentID = () => {
     try {
       const url = editingStudent ? '/api/students/idgenstd' : '/api/students/idgenstd';
       const method = editingStudent ? 'PUT' : 'POST';
-      
+
       if (editingStudent) {
         submitData.append('studentId', editingStudent);
       }
@@ -311,8 +212,8 @@ const generateStudentID = () => {
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.parentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.contactNumber.includes(searchTerm);
+      student.parentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.contactNumber.includes(searchTerm);
     const matchesClass = !classFilter || student.class === classFilter;
     return matchesSearch && matchesClass;
   });
@@ -320,6 +221,7 @@ const generateStudentID = () => {
   const classes = ['Nursery', 'Jr.Kg', 'Sr.Kg', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th'];
 
   return (
+    <Layout>
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
@@ -343,11 +245,10 @@ const generateStudentID = () => {
 
         {/* Message Display */}
         {message && (
-          <div className={`mb-6 p-4 rounded-lg border ${
-            message.includes('Error') || message.includes('error')
+          <div className={`mb-6 p-4 rounded-lg border ${message.includes('Error') || message.includes('error')
               ? 'bg-red-50 border-red-200 text-red-800'
               : 'bg-green-50 border-green-200 text-green-800'
-          }`}>
+            }`}>
             {message}
           </div>
         )}
@@ -522,14 +423,14 @@ const generateStudentID = () => {
           {/* ID Card Generator */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Generate ID Card</h2>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Select Student</label>
                 <select
                   value={selectedStudent}
                   onChange={(e) => setSelectedStudent(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  className="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none appearance-none"
                 >
                   <option value="" className="text-gray-500">Choose a student</option>
                   {students.map(student => (
@@ -559,7 +460,7 @@ const generateStudentID = () => {
             </div>
 
             {/* ID Card Preview */}
-            {currentStudentData && (
+            {idCardData && (
               <div className="mt-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">ID Card Preview</h3>
                 <div
@@ -567,38 +468,38 @@ const generateStudentID = () => {
                   className="bg-gradient-to-br from-blue-600 to-purple-700 text-white p-6 rounded-xl max-w-sm mx-auto shadow-lg"
                 >
                   <div className="text-center mb-4">
-                    <h4 className="text-lg font-bold">{currentStudentData.schoolName || 'School Name'}</h4>
+                    <h4 className="text-lg font-bold">{idCardData.schoolName}</h4>
                     <p className="text-sm opacity-90">Student ID Card</p>
                   </div>
-                  
+
                   <div className="flex items-center gap-4 mb-4">
                     <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center overflow-hidden">
-                      {currentStudentData.photoUrl ? (
+                      {idCardData.photoUrl ? (
                         <img
-                          src={currentStudentData.photoUrl}
+                          src={idCardData.photoUrl}
                           alt="Student"
                           className="w-14 h-14 rounded-full object-cover"
                         />
                       ) : (
                         <div className="w-14 h-14 bg-gray-300 rounded-full flex items-center justify-center">
                           <span className="text-gray-600 text-2xl font-bold">
-                            {currentStudentData.studentName ? currentStudentData.studentName.charAt(0).toUpperCase() : 'N'}
+                            {idCardData.studentName.charAt(0).toUpperCase()}
                           </span>
                         </div>
                       )}
                     </div>
                     <div className="flex-1">
-                      <h5 className="font-semibold text-lg capitalize">{currentStudentData.studentName || 'Student Name'}</h5>
-                      <p className="text-sm opacity-90">Class: {currentStudentData.class || 'N/A'}</p>
-                      <p className="text-sm opacity-90">ID: {currentStudentData.idNumber || 'N/A'}</p>
+                      <h5 className="font-semibold text-lg capitalize">{idCardData.studentName}</h5>
+                      <p className="text-sm opacity-90">Class: {idCardData.class}</p>
+                      <p className="text-sm opacity-90">ID: {idCardData.idNumber}</p>
                     </div>
                   </div>
-                  
+
                   <div className="text-xs space-y-1 bg-black bg-opacity-20 p-3 rounded-lg">
-                    <p><span className="font-medium">Roll No:</span> {currentStudentData.rollNumber || 'N/A'}</p>
-                    <p><span className="font-medium">Parent:</span> {currentStudentData.parentName || 'N/A'}</p>
-                    <p><span className="font-medium">Contact:</span> {currentStudentData.contactNumber || 'N/A'}</p>
-                    <p><span className="font-medium">Valid Until:</span> {currentStudentData.validUntil ? new Date(currentStudentData.validUntil).toLocaleDateString() : 'N/A'}</p>
+                    <p><span className="font-medium">Roll No:</span> {idCardData.rollNumber}</p>
+                    <p><span className="font-medium">Parent:</span> {idCardData.parentName}</p>
+                    <p><span className="font-medium">Contact:</span> {idCardData.contactNumber}</p>
+                    <p><span className="font-medium">Valid Until:</span> {new Date(idCardData.validUntil).toLocaleDateString()}</p>
                   </div>
                 </div>
               </div>
@@ -622,14 +523,14 @@ const generateStudentID = () => {
                   placeholder="Search students, parents, or contact..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-500"
+                  className="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
                 />
               </div>
               <div className="sm:w-40">
                 <select
                   value={classFilter}
                   onChange={(e) => setClassFilter(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  className="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none appearance-none"
                 >
                   <option value="" className="text-gray-500">All Classes</option>
                   {classes.map(cls => (
@@ -660,19 +561,19 @@ const generateStudentID = () => {
                             />
                           ) : (
                             <span className="text-blue-600 font-medium text-lg">
-                              {student.studentName ? student.studentName.charAt(0).toUpperCase() : 'N'}
+                              {student.studentName.charAt(0).toUpperCase()}
                             </span>
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <h4 className="font-medium text-gray-900 capitalize truncate">{student.studentName || 'Unnamed Student'}</h4>
+                          <h4 className="font-medium text-gray-900 capitalize truncate">{student.studentName}</h4>
                           <div className="flex flex-col sm:flex-row sm:gap-4 text-sm text-gray-600">
-                            <span>Class: {student.class || 'N/A'}</span>
-                            <span>Parent: {student.parentName || 'N/A'}</span>
+                            <span>Class: {student.class}</span>
+                            <span>Parent: {student.parentName}</span>
                           </div>
                           <div className="flex flex-col sm:flex-row sm:gap-4 text-sm text-gray-500">
-                            <span>{student.contactNumber || 'No contact'}</span>
-                            <span>{student.parentEmail || 'No email'}</span>
+                            <span>{student.contactNumber}</span>
+                            <span>{student.parentEmail}</span>
                           </div>
                         </div>
                       </div>
@@ -770,5 +671,6 @@ const generateStudentID = () => {
         </div>
       </div>
     </div>
+    </Layout>
   );
 }

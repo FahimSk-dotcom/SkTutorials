@@ -455,9 +455,9 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
 
                     {/* Search and Filters */}
                     <div className="bg-gray-800 rounded-lg p-4 mb-6">
-                        <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex flex-col gap-4">
                             {/* Search */}
-                            <div className="flex-1 relative">
+                            <div className="relative">
                                 <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                                 <input
                                     type="text"
@@ -469,14 +469,15 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
                             </div>
 
                             {/* Filter Buttons */}
-                            <div className="flex gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap gap-2">
                                 {['All', 'Paid', 'Due Today', 'Overdue', 'Past Overdue', 'Due'].map((filter) => (
                                     <button
                                         key={filter}
                                         onClick={() => setFilterStatus(filter)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filterStatus === filter
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                        className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
+                                            ${filterStatus === filter
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                             }`}
                                     >
                                         {filter}
