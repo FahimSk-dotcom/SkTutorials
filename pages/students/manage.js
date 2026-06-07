@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Search, Edit, Trash2, Users, Phone, User, GraduationCap, X, Check, AlertCircle, Calendar, DollarSign, Eye } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Users, Phone, User, GraduationCap, X, Check, AlertCircle, Calendar, IndianRupee, Eye } from 'lucide-react';
 import Layout from '@/components/Layout';
 
 const gradeOrder = ['Nursery', 'LKG', 'UKG', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th'];
@@ -509,7 +509,7 @@ const ManageStudents = ({ darkMode, toggleDarkMode }) => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center text-sm text-slate-300">
-                            <DollarSign className="h-4 w-4 mr-2" />
+                            <IndianRupee className="h-4 w-4 mr-2" />
                             {student.lastFeePaidDate ? formatDate(student.lastFeePaidDate) : 'No payments yet'}
                           </div>
                         </td>
@@ -758,7 +758,7 @@ const ManageStudents = ({ darkMode, toggleDarkMode }) => {
                       </div>
                     ) : (
                       <div className="text-center py-8 text-slate-400">
-                        <DollarSign className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <IndianRupee className="h-12 w-12 mx-auto mb-2 opacity-50" />
                         <p>No fee records available</p>
                         <p className="text-xs mt-1">Fee status will appear here once payments are recorded</p>
                       </div>
