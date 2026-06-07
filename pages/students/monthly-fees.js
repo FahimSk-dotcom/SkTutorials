@@ -200,12 +200,22 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
     const [selectedYear, setSelectedYear] = useState(getCurrentAcademicYear());
     const [showYearDropdown, setShowYearDropdown] = useState(false);
 
+    // Client-only date label to avoid SSR hydration mismatch
+    const [todayLabel, setTodayLabel] = useState("");
+
     const studentsPerPage = 10;
 
     // Derive available years from loaded students
     const academicYearOptions = useMemo(() => buildAcademicYearOptions(students), [students]);
 
     useEffect(() => { fetchStudents(); }, []);
+
+    useEffect(() => {
+        const d = new Date();
+        const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+        const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+        setTodayLabel(`${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`);
+    }, []);
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -480,9 +490,7 @@ const MonthlyFeesPage = ({ darkMode, toggleDarkMode }) => {
 
                             {/* Date */}
                             <span className="text-sm text-gray-400">
-                                {new Date().toLocaleDateString('en-GB', {
-                                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                                })}
+                                {todayLabel}
                             </span>
                         </div>
                     </div>
